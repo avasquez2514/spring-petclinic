@@ -1,25 +1,39 @@
 trigger:
-- main
+- main  # El nombre de la rama que activará el pipeline
 
 pool:
-  vmImage: ubuntu-latest
+  vmImage: 'ubuntu-latest'
 
-stages:
-- stage: Build
-  displayName: Build stage
-  jobs:  
-  - job: Build
-    displayName: Build Maven Project
-    steps:
-    - task: Maven@4
-      displayName: 'Maven Package'
-      inputs:
-        mavenPomFile: 'pom.xml'
-    - task: CopyFiles@2
-      displayName: 'Copy Files to artifact staging directory'
-      inputs:
-        SourceFolder: '$(System.DefaultWorkingDirectory)'
-        Contents: '**/target/*.?(war|jar)'
-        TargetFolder: $(Build.ArtifactStagingDirectory)
-    - upload: $(Build.ArtifactStagingDirectory)
-      artifact: drop
+variables:
+  sshConnection: 'user@your-vm-ip'  # Reemplaza con tu usuario y la IP de la VM
+  sshKey: $(sshKey)  # Variable secreta configurada en Azure DevOps con tu clave SSH
+
+steps:
+- task: UsePythonVersion@0
+  inputs:
+    versionSpec: '3.x'
+    addToPath: true
+
+- script: |
+    python -m pip install --upgrade pip
+    pip install -r requirements.txt
+  displayName: 'Install dependencies'
+
+- task: CopyFilesOverSSH@0
+  inputs:
+    sshEndpoint: 'SSH Service Connection'
+    sourceFolder: '$(Build.SourcesDirectory)'
+    contents: '**'
+    targetFolder: '/home/user/app'  # Directorio en la VM
+    cleanTargetFolder: true
+    overwrite: true
+
+- task: SSH@0
+  inputs:
+    sshEndpoint: 'SSH Service Connection'
+    runOptions: 'inline'
+    inline: |
+      cd /home/user/app
+      # Comandos para iniciar la aplicación, por ejemplo:
+      docker-compose up -d
+  displayName: 'Deploy application'
