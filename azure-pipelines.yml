@@ -1,39 +1,40 @@
+# Maven
+- task: AzureFunctionApp@2
+  inputs:
+    appType: 'functionApp'
+    appName: 
+    package: '$(System.DefaultWorkingDirectory)/**/*.zip'
+    deploymentMethod: 'auto'
+# Build your Java project and run tests with Apache Maven.
+# Add steps that analyze code, save build artifacts, deploy, and more:
+# https://docs.microsoft.com/azure/devops/pipelines/languages/java
+
 trigger:
-- main  # El nombre de la rama que activará el pipeline
+- master
 
 pool:
-  vmImage: 'ubuntu-latest'
-
-variables:
-  sshConnection: 'user@your-vm-ip'  # Reemplaza con tu usuario y la IP de la VM
-  sshKey: $(sshKey)  # Variable secreta configurada en Azure DevOps con tu clave SSH
+  vmImage: ubuntu-latest
 
 steps:
-- task: UsePythonVersion@0
+- task: Maven@3
+  displayName: 'Maven app/pom.xml'
   inputs:
-    versionSpec: '3.x'
-    addToPath: true
+    mavenPomFile: 'app/pom.xml'
+    codeCoverageToolOption: cobertura
 
-- script: |
-    python -m pip install --upgrade pip
-    pip install -r requirements.txt
-  displayName: 'Install dependencies'
 
-- task: CopyFilesOverSSH@0
+- task: CopyFiles@2
+  displayName: 'Copy Files to: $(Build.ArtifactStagingDirectory)'
   inputs:
-    sshEndpoint: 'SSH Service Connection'
-    sourceFolder: '$(Build.SourcesDirectory)'
-    contents: '**'
-    targetFolder: '/home/user/app'  # Directorio en la VM
-    cleanTargetFolder: true
-    overwrite: true
+    SourceFolder: '$(Build.SourcesDirectory)'
+    Contents: '**/*.jar'
+    TargetFolder: '$(Build.ArtifactStagingDirectory)'
+    CleanTargetFolder: true
+    preserveTimestamp: true
 
-- task: SSH@0
+- task: PublishBuildArtifacts@1
   inputs:
-    sshEndpoint: 'SSH Service Connection'
-    runOptions: 'inline'
-    inline: |
-      cd /home/user/app
-      # Comandos para iniciar la aplicación, por ejemplo:
-      docker-compose up -d
-  displayName: 'Deploy application'
+    PathtoPublish: '$(Build.ArtifactStagingDirectory)'
+    ArtifactName: 'drop'
+    publishLocation: 'Container'
+  condition: succeededOrFailed()
